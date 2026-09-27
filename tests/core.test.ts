@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {parseWorkbook} from '../lib/import';
+import {evaluate,classify,previousMonth,type Client} from '../lib/portfolio';
+import {datasetSchema} from '../lib/validation';
+import seed from '../lib/seed.json';
+const source=process.env.SOURCE_WORKBOOK||"../work/source.xlsx";
+const d=await parseWorkbook(new File([fs.readFileSync(source)],'Cliente Classificados - frequencia 2026.xlsx'));
+assert.equal(d.items,36244);assert.equal(d.clients.length,1884);assert.equal(d.cutoff,'2026-09-09');
+assert.equal(d.clients.reduce((s,c)=>s+Object.values(c.months).reduce((a,m)=>a+m.cents,0),0),115278547);
+assert.deepEqual(JSON.parse(JSON.stringify(d.clients)),seed.clients);datasetSchema.parse({...d,coverageConfirmed:true});
+const c:Client={id:'1',name:'Teste',document:'',first:'2026-01-01',last:'2026-02-02',months:{'2026-01':{items:1,cents:0,services:{'Teste':{items:1,cents:0}}},'2026-02':{items:2,cents:100,services:{'Teste':{items:2,cents:100}}}}};
+assert.equal(evaluate(c,'2026-02'),'normal');assert.equal(evaluate(c,'2026-03'),'forte');assert.equal(evaluate({...c,months:{'2026-02':c.months['2026-02']}},'2026-03'),'ausencia');assert.equal(previousMonth('2026-01'),'2025-12');
+const abc=classify(d.clients,d.closedThrough);assert.equal(abc.size,1884);assert.equal([...abc.values()].at(-1)?.cumulative,1);
+assert.throws(()=>datasetSchema.parse({...d,coverageConfirmed:true,items:1}));
+assert.throws(()=>datasetSchema.parse({...d,coverageConfirmed:true,closedThrough:'2026-09'}));
+console.log('PASS: importação real, centavos, classificação ABC, alertas, virada de ano e validação de totais.');
